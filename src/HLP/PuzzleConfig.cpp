@@ -1,5 +1,6 @@
 #include "PuzzleConfig.h"
 
+#include <format>
 #include <stack>
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -7,10 +8,12 @@
 #include "Logger.h"
 #include "Utils.h"
 
-PuzzleConfig::PuzzleConfig(int puzzleSizeX, int puzzleSizeZ) : _PuzzleSizeX(puzzleSizeX), _PuzzleSizeZ(puzzleSizeZ)
-{
-    LOG_INFO("Constructed puzzle config with sizeX = %d, sizeZ = %d", puzzleSizeX, puzzleSizeZ);
-}
+int PuzzleConfig::_NoPiece = -1;
+int PuzzleConfig::_Inf = 0x3f3f3f3f;
+
+int PuzzleConfig::_DxArray[4] = {0, 0, -1, 1};
+int PuzzleConfig::_DzArray[4] = {-1, 1, 0, 0};
+const char *PuzzleConfig::_DirArray[4] = {"BACK", "FORWARD", "LEFT", "RIGHT"};
 
 void PuzzleConfig::AddPuzzlePiece(std::shared_ptr<PuzzlePiece> puzzlePiece)
 {
@@ -21,34 +24,27 @@ void PuzzleConfig::Render(Shader &shader, VertexBuffer &voxelModel)
 {
     shader.Activate();
 
-    int prevWireframeState = 0;
     glm::vec3 pos{};
 
-    for (int x = 0; x < 3 * _PuzzleSizeX; x++)
+    for (int x = 0; x < _SizeX; x++)
     {
-        for (int z = 0; z < 3 * _PuzzleSizeZ; z++)
+        int z = 0;
+        for (auto &run : _OccupiedRLEMapZ[x])
         {
-            glm::mat4 model(1.0f);
-            pos = {x - _PuzzleSizeX, 0, z - _PuzzleSizeZ}; // don't forget to map coordinates
-            shader.SetUniform("model", glm::translate(model, pos));
-
-            int pieceNo = _OccupiedMap[x][z];
+            int pieceNo = run._PieceNo, length = run._Length;
             if (pieceNo != _NoPiece && !_PuzzlePieceInvisibility[pieceNo])
             {
-                shader.SetUniform("color", _PuzzlePieceMaterials[_PuzzlePieceMaterialsMap[pieceNo]]._Color);
-                if (prevWireframeState)
+                for (int dz = 0; dz < length; dz++)
                 {
-                    shader.SetUniform("wireframe", 0);
-                    prevWireframeState = 0;
+                    glm::mat4 model(1.0f);
+                    pos = {x + _MinX, 0, z + dz + _MinZ}; // don't forget to map coordinates
+                    shader.SetUniform("model", glm::translate(model, pos));
+                    shader.SetUniform("color", _PuzzlePieceMaterials[_PuzzlePieceMaterialsMap[pieceNo]]._Color);
+                    voxelModel.DrawTriangles(0, 36);
                 }
             }
-            else if (!prevWireframeState)
-            {
-                shader.SetUniform("wireframe", 1);
-                prevWireframeState = 1;
-            }
 
-            voxelModel.DrawTriangles(0, 36);
+            z += length;
         }
     }
 }
@@ -107,30 +103,28 @@ void PuzzleConfig::AssignPuzzlePieceMaterials()
     }
 }
 
-void PuzzleConfig::BuildAdjacencyGraph()
+void PuzzleConfig::_BuildAdjacencyGraph(std::vector<std::vector<int>> &occupiedMap)
 {
-    static const int dxArray[4] = {0, 0, -1, 1};
-    static const int dzArray[4] = {-1, 1, 0, 0};
-
     _AdjacencyGraph.resize(_Data.size());
 
     // initially all pieces' coordinates are in [0, sizeX) x [0, sizeZ)
     // mapped coordinates are in [sizeX, 2 * sizeX) x [sizeZ, 2 * sizeZ)
     // time complexity: O(4 * _PuzzleSizeX * _PuzzleSizeZ)
 
-    for (int x = _PuzzleSizeX; x < 2 * _PuzzleSizeX; x++)
+    for (int x = 0; x < _SizeX; x++)
     {
-        for (int z = _PuzzleSizeZ; z < 2 * _PuzzleSizeZ; z++)
+        for (int z = 0; z < _SizeZ; z++)
         {
-            if (_OccupiedMap[x][z] != _NoPiece)
+            if (occupiedMap[x][z] != _NoPiece)
             {
                 for (int d = 0; d < 4; d++)
                 {
-                    int nx = x + dxArray[d];
-                    int nz = z + dzArray[d];
-                    if (_OccupiedMap[nx][nz] != _NoPiece && _OccupiedMap[nx][nz] != _OccupiedMap[x][z])
+                    int nx = x + _DxArray[d];
+                    int nz = z + _DzArray[d];
+                    if (nx >= 0 && nx < _SizeX && nz >= 0 && nz < _SizeZ && occupiedMap[nx][nz] != _NoPiece &&
+                        occupiedMap[nx][nz] != occupiedMap[x][z])
                     {
-                        _AdjacencyGraph[_OccupiedMap[x][z]].insert(_OccupiedMap[nx][nz]);
+                        _AdjacencyGraph[occupiedMap[x][z]].insert(occupiedMap[nx][nz]);
                     }
                 }
             }
@@ -152,28 +146,6 @@ void PuzzleConfig::BuildAdjacencyGraph()
     });
 }
 
-void PuzzleConfig::BuildOccupiedMap()
-{
-    // occupied graph is 8x bigger than the original puzzle to simplify edge conditions
-    // since the puzzle won't be very large (restricted by the computational cost)
-    // such design is reasonable..I think.
-    // time complexity: O(total number of voxels)
-
-    _OccupiedMap = std::vector<std::vector<int>>(3 * _PuzzleSizeX, std::vector<int>(3 * _PuzzleSizeZ, _NoPiece));
-    int n = _Data.size();
-    for (int i = 0; i < n; i++)
-    {
-        auto &[piece, state] = _Data[i];
-        for (auto &voxel : piece->_Voxels)
-        {
-            // NOTE: coordinates need to be mapped to fit into the occupied map
-            int x = voxel._X + state._OffsetX + _PuzzleSizeX;
-            int z = voxel._Z + state._OffsetZ + _PuzzleSizeZ;
-            _OccupiedMap[x][z] = i;
-        }
-    }
-}
-
 void PuzzleConfig::CalculateNeighborConfigs(std::vector<std::shared_ptr<PuzzleConfig>> &neighborConfigs)
 {
     // 0. build acceleration structure
@@ -186,13 +158,31 @@ void PuzzleConfig::CalculateNeighborConfigs(std::vector<std::shared_ptr<PuzzleCo
         DEBUG_SCOPE({
             for (auto pieceNo : subasmPieceNos)
             {
-                std::cout << pieceNo << ' ';
+                std::cout << '<' << pieceNo << "> ";
             }
             std::cout << std::endl;
         });
 
-        // 2. calculate the max number movable steps
-        // 3. for each step, generate a neighborconfig
+        // 2. calculate the max movable distance in each direction
+        for (int d = 0; d < 4; d++)
+        {
+            int maxMovableSteps = _CalculateMaxMovableDistance(subasmPieceNos, d);
+
+            LOG_INFO("MaxMovableSteps in direction %s: %d", _DirArray[d], maxMovableSteps);
+
+            // 3.
+            if (maxMovableSteps == _Inf) // remove the subassembly and label it as a target node
+            {
+                ;
+            }
+            else // for each unit distance, generate a neighborconfig
+            {
+                for (int dist = 1; dist <= maxMovableSteps; dist++)
+                {
+                    ;
+                }
+            }
+        }
     });
 }
 
@@ -201,7 +191,7 @@ void PuzzleConfig::_EnumerateSubassembly(int depth, std::set<int> &pieceNos, con
     // Normally enumeration on sets have exponential time complexity
     // But through correct pruning we will never reach that upper limit! (i hope so)
 
-    if (depth != 0)
+    if (pieceNos.size() <= (_Data.size() + 1) / 2 && depth != 0)
     {
         callback();
     }
@@ -284,7 +274,230 @@ void PuzzleConfig::_BuildSubassemblyValidater()
     }
 }
 
-int PuzzleConfig::_MaxMovableDistance(int pieceNo)
+int PuzzleConfig::_CalculateMaxMovableDistance(std::set<int> &pieceNos, int direction)
 {
-    return 0;
+    // stuck at here for a couple of hours
+    // I am too dumb to figure this out..but eventually did it!
+    // KEY idea: a subassembly can be removed *if and only if* no other pieces block its way in the moving direction!
+
+    // now the problem is how to implement the idea above.
+    // add more assumptions (restrictions) on the puzzle may be a good choice to solve this
+    // but that will make the puzzle less fun!
+    // in order to "efficiently" (both in time and space) do this , I proposed an approach with bounding box + RLE
+    // inspired by an article read months ago: https://0fps.net/2012/01/14/an-analysis-of-minecraft-like-engines/
+
+    int maxMovableDistance = _Inf;
+    int dx = _DxArray[direction], dz = _DzArray[direction];
+    bool removable = true;
+
+    // we can check the max movable distance of each voxel in the subassembly
+    for (auto pieceNo : pieceNos)
+    {
+        auto &[piece, state] = _Data[pieceNo];
+        for (auto &voxel : piece->_Voxels)
+        {
+            int x = voxel._X + state._OffsetX - _MinX;
+            int z = voxel._Z + state._OffsetZ - _MinZ;
+            if (dx != 0)
+            {
+                // first locate the piece in RLEMap
+                int RLEMapXSize_Z = _OccupiedRLEMapX[z].size();
+                int offset =
+                    std::upper_bound(_OccupiedRLEMapPreX[z].begin(), _OccupiedRLEMapPreX[z].end(), x) - _OccupiedRLEMapPreX[z].begin() - 1;
+
+                while (offset >= 0 && offset < RLEMapXSize_Z)
+                {
+                    int pieceNoCheck = _OccupiedRLEMapX[z][offset]._PieceNo;
+
+                    if (pieceNoCheck != _NoPiece && !pieceNos.contains(pieceNoCheck))
+                    {
+                        int blockCoord =
+                            _OccupiedRLEMapPreX[z][offset + 1] -
+                            _OccupiedRLEMapX[z][offset]._Length; // coordinate of the first voxel that blocks the way of current voxel
+                        if (dx < 0)
+                        {
+                            blockCoord = _OccupiedRLEMapPreX[z][offset + 1] - 1;
+                        }
+                        maxMovableDistance = std::min(maxMovableDistance, std::abs(x - blockCoord) - 1);
+                        removable = false;
+                        break;
+                    }
+
+                    offset += dx;
+                }
+            }
+            else // dz != 0, similar
+            {
+                int RLEMapZSize_X = _OccupiedRLEMapZ[x].size();
+                int offset =
+                    std::upper_bound(_OccupiedRLEMapPreZ[x].begin(), _OccupiedRLEMapPreZ[x].end(), z) - _OccupiedRLEMapPreZ[x].begin() - 1;
+
+                while (offset >= 0 && offset < RLEMapZSize_X)
+                {
+                    int pieceNoCheck = _OccupiedRLEMapZ[x][offset]._PieceNo;
+
+                    if (pieceNoCheck != _NoPiece && !pieceNos.contains(pieceNoCheck))
+                    {
+                        int blockCoord = _OccupiedRLEMapPreZ[x][offset + 1] - _OccupiedRLEMapZ[x][offset]._Length;
+                        if (dz < 0)
+                        {
+                            blockCoord = _OccupiedRLEMapPreZ[x][offset + 1] - 1;
+                        }
+                        maxMovableDistance = std::min(maxMovableDistance, std::abs(z - blockCoord) - 1);
+                        removable = false;
+                        break;
+                    }
+
+                    offset += dz;
+                }
+            }
+        }
+    }
+
+    return removable ? _Inf : maxMovableDistance;
+}
+
+void PuzzleConfig::_CalculateBoundingBox()
+{
+    _MinX = _Inf;
+    _MinZ = _Inf;
+    _MaxX = -_Inf;
+    _MaxZ = -_Inf;
+
+    for (auto &[piece, state] : _Data)
+    {
+        for (auto &voxel : piece->_Voxels)
+        {
+            int x = voxel._X + state._OffsetX;
+            int z = voxel._Z + state._OffsetZ;
+
+            _MinX = std::min(_MinX, x);
+            _MinZ = std::min(_MinZ, z);
+            _MaxX = std::max(_MaxX, x);
+            _MaxZ = std::max(_MaxZ, z);
+        }
+    }
+
+    _SizeX = _MaxX - _MinX + 1;
+    _SizeZ = _MaxZ - _MinZ + 1;
+}
+
+void PuzzleConfig::_BuildOccupiedRLEMap(std::vector<std::vector<int>> &occupiedMap)
+{
+    _OccupiedRLEMapX.resize(_SizeZ);
+    _OccupiedRLEMapPreX.resize(_SizeZ);
+    for (int z = 0; z < _SizeZ; z++)
+    {
+        int prev = 0;
+        for (int x = 1; x < _SizeX; x++)
+        {
+            if (occupiedMap[x - 1][z] != occupiedMap[x][z])
+            {
+                _OccupiedRLEMapX[z].push_back({occupiedMap[x - 1][z], x - prev});
+                prev = x;
+            }
+        }
+
+        // process the last segment
+        _OccupiedRLEMapX[z].push_back({occupiedMap[prev][z], _SizeX - prev});
+
+        int n = _OccupiedRLEMapX[z].size();
+        _OccupiedRLEMapPreX[z].resize(n + 1);
+        for (int i = 0; i < n; i++)
+        {
+            _OccupiedRLEMapPreX[z][i + 1] = _OccupiedRLEMapPreX[z][i] + _OccupiedRLEMapX[z][i]._Length;
+        }
+
+        LOG_INFO("Constructed _OccupiedRLEMapX[%d]:", z);
+        DEBUG_SCOPE({
+            for (auto &run : _OccupiedRLEMapX[z])
+            {
+                std::cout << std::format("<{}, {}> ", run._PieceNo, run._Length);
+            }
+            std::cout << std::endl;
+        });
+
+        LOG_INFO("Constructed _OccupiedRLEMapPreX[%d]:", z);
+        DEBUG_SCOPE({
+            for (auto &val : _OccupiedRLEMapPreX[z])
+            {
+                std::cout << val << ' ';
+            }
+            std::cout << std::endl;
+        });
+    }
+
+    // similar
+    _OccupiedRLEMapZ.resize(_SizeX);
+    _OccupiedRLEMapPreZ.resize(_SizeX);
+    for (int x = 0; x < _SizeX; x++)
+    {
+        int prev = 0;
+        for (int z = 1; z < _SizeZ; z++)
+        {
+            if (occupiedMap[x][z - 1] != occupiedMap[x][z])
+            {
+                _OccupiedRLEMapZ[x].push_back({occupiedMap[x][z - 1], z - prev});
+                prev = z;
+            }
+        }
+
+        // process the last segment
+        _OccupiedRLEMapZ[x].push_back({occupiedMap[x][prev], _SizeZ - prev});
+
+        int n = _OccupiedRLEMapZ[x].size(), run = 0;
+        _OccupiedRLEMapPreZ[x].resize(n + 1);
+        for (int i = 0; i < n; i++)
+        {
+            _OccupiedRLEMapPreZ[x][i + 1] = _OccupiedRLEMapPreZ[x][i] + _OccupiedRLEMapZ[x][i]._Length;
+        }
+
+        LOG_INFO("Constructed _OccupiedRLEMapZ[%d]:", x);
+        DEBUG_SCOPE({
+            for (auto &run : _OccupiedRLEMapZ[x])
+            {
+                std::cout << std::format("<{}, {}> ", run._PieceNo, run._Length);
+            }
+            std::cout << std::endl;
+        });
+
+        LOG_INFO("Constructed _OccupiedRLEMapPreZ[%d]:", x);
+        DEBUG_SCOPE({
+            for (auto &val : _OccupiedRLEMapPreZ[x])
+            {
+                std::cout << val << ' ';
+            }
+            std::cout << std::endl;
+        });
+    }
+}
+
+void PuzzleConfig::BuildAccelStructures()
+{
+    _CalculateBoundingBox();
+
+    std::vector<std::vector<int>> occupiedMap(_SizeX, std::vector<int>(_SizeZ, _NoPiece));
+    int n = _Data.size();
+    for (int i = 0; i < n; i++)
+    {
+        auto &[piece, state] = _Data[i];
+        for (auto &voxel : piece->_Voxels)
+        {
+            // coordinates need to be mapped!
+            int x = voxel._X + state._OffsetX - _MinX;
+            int z = voxel._Z + state._OffsetZ - _MinZ;
+            occupiedMap[x][z] = i;
+        }
+    }
+
+    // occupied rle map is used to facilitate:
+    // 1. check collisions
+    // 2. rendering (yes it's cache-friendly!)
+    // 3. assist buding adjacency graph
+    _BuildOccupiedRLEMap(occupiedMap);
+
+    // adjacency graph is used to facilitate:
+    // 1. material assignment
+    // 2. subassembly enumeration
+    _BuildAdjacencyGraph(occupiedMap);
 }

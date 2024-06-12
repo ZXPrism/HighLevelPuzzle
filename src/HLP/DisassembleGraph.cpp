@@ -32,9 +32,9 @@ bool DisassembleGraph::ImportPuzzle(const std::string &puzzleFilePath)
     // 1. the number of puzzle pieces
     // 2. the x-axis size of puzzle
     // 3. the z-axis size of puzzle
-    int pieceNum = 0, sizeX = 0, sizeZ = 0;
-    fin >> pieceNum >> sizeX >> sizeZ;
-    auto &rootNode = _GraphNodes.emplace_back(std::make_shared<PuzzleConfig>(sizeX, sizeZ));
+    int pieceNum = 0;
+    fin >> pieceNum;
+    auto &rootNode = _GraphNodes.emplace_back(std::make_shared<PuzzleConfig>());
 
     // load each puzzle piece
     for (int i = 0; i < pieceNum; i++)
@@ -55,25 +55,12 @@ bool DisassembleGraph::ImportPuzzle(const std::string &puzzleFilePath)
 
     fin.close();
 
-    // ======= generate acceleration structures of the config
-    // occupied map is used to facilitate:
-    // 1. check colisions
-    // 2. rendering (yes it's cache-friendly!)
-    // 3. assist buding adjacency graph
-    rootNode->BuildOccupiedMap();
+    // generate acceleration structures of the config
+    rootNode->BuildAccelStructures();
 
-    // adjacency graph is used to facilitate:
-    // 1. material assignment
-    // 2. subassembly iteration
-    rootNode->BuildAdjacencyGraph();
-
-    // eventually we assign the materials to the pieces
+    // assign the materials to the pieces
     // in order to distinguish them
     rootNode->AssignPuzzlePieceMaterials();
-
-    // btw, for a specific config, these acceleration structures won't change
-    // we can build them only once
-    // but they can also be used to facilitate the generation of neighbor configs
 
     LOG_INFO("Successfully imported puzzle with %d puzzle pieces", pieceNum);
 

@@ -10,8 +10,11 @@ struct GLFWwindow;
 namespace ui {
     namespace internal {
         void PresetStyle();
-        void ShowDemoWindow();
         void LoadFonts(const char *pFontPath = cpDefaultFontPath);
+
+#ifdef MY_DEBUG
+        void ShowDemoWindow();
+#endif
 
     } // namespace internal
 

@@ -4,6 +4,7 @@
 
 #include <imgui.h>
 
+#include "Logger.h"
 #include "Timer.h"
 #include "UI.h"
 #include "Utils.h"
@@ -149,8 +150,14 @@ void PuzzleDemonstrator::RenderMenu_DasmPlanner()
         ImGui::Text("Current Config: #%d", _CurrentConfigNo);
         if (ImGui::Button("Show Neighbor Configs"))
         {
+            auto &rootConfig = _DasmGraph.GetPuzzleConfig(0);
             std::vector<std::shared_ptr<PuzzleConfig>> neighborConfigs;
-            _DasmGraph.GetPuzzleConfig(0).CalculateNeighborConfigs(neighborConfigs);
+            rootConfig.CalculateNeighborConfigs(neighborConfigs);
+            // std::set<int> x = {0};
+            // for (int i = 0; i < 4; i++)
+            // {
+            //     LOG_INFO("(direction: %d) ==> %d", i, rootConfig._CalculateMaxMovableDistance(x, i));
+            // }
         }
     }
 }
