@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#ifdef MY_DEBUG
+#ifdef DETAILED_DEBUG_INFO
 #define DEBUG_SCOPE(x)                                                                                                                     \
     do                                                                                                                                     \
     {                                                                                                                                      \

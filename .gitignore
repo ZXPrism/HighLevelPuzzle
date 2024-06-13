@@ -1,5 +1,6 @@
 .vs
 .vscode
+.VSCodeCounter
 .cache
 .xmake
 bin

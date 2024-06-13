@@ -15,13 +15,16 @@ public:
     bool ImportPuzzle(const std::string &puzzleFilePath);
 
     // config operations
-    void RenderConfig(int configNo, Shader &shader, VertexBuffer &voxelModel);
-    void CalculateNeighborConfigs(int configNo, std::vector<std::shared_ptr<PuzzleConfig>> &neighborConfigs);
+    void RenderConfig(int configID, Shader &shader, VertexBuffer &voxelModel);
+    void CalculateNeighborConfigs(int configID, std::vector<std::shared_ptr<PuzzleConfig>> &neighborConfigs);
+    void BuildKernelDisassemblyGraph(int configID = 0);
 
     // queries
-    PuzzleConfig &GetPuzzleConfig(int configNo);
+    PuzzleConfig &GetPuzzleConfig(int configID);
+    int GetPuzzleConfigNum() const;
 
     // tests
+    void Test_AddAllNeighborConfigs(int configID); // this action doesn't maintain edges!
 
 private:
     std::vector<std::set<int>> _GraphEdges;

@@ -1,6 +1,7 @@
 #include "DisassembleGraph.h"
 
 #include <fstream>
+#include <queue>
 
 #include "Logger.h"
 
@@ -34,7 +35,7 @@ bool DisassembleGraph::ImportPuzzle(const std::string &puzzleFilePath)
     // 3. the z-axis size of puzzle
     int pieceNum = 0;
     fin >> pieceNum;
-    auto &rootNode = _GraphNodes.emplace_back(std::make_shared<PuzzleConfig>());
+    auto &rootNode = _GraphNodes.emplace_back(std::make_shared<PuzzleConfig>(0));
 
     // load each puzzle piece
     for (int i = 0; i < pieceNum; i++)
@@ -50,7 +51,7 @@ bool DisassembleGraph::ImportPuzzle(const std::string &puzzleFilePath)
             piece->_Voxels.emplace_back(x, z);
         }
 
-        rootNode->AddPuzzlePiece(piece);
+        rootNode->AddPuzzlePiece(i, piece);
     }
 
     fin.close();
@@ -67,17 +68,41 @@ bool DisassembleGraph::ImportPuzzle(const std::string &puzzleFilePath)
     return true;
 }
 
-PuzzleConfig &DisassembleGraph::GetPuzzleConfig(int configNo)
+PuzzleConfig &DisassembleGraph::GetPuzzleConfig(int configID)
 {
-    return *_GraphNodes[configNo];
+    return *_GraphNodes[configID];
 }
 
-void DisassembleGraph::RenderConfig(int configNo, Shader &shader, VertexBuffer &voxelModel)
+void DisassembleGraph::RenderConfig(int configID, Shader &shader, VertexBuffer &voxelModel)
 {
-    _GraphNodes[configNo]->Render(shader, voxelModel);
+    _GraphNodes[configID]->Render(shader, voxelModel);
 }
 
-void DisassembleGraph::CalculateNeighborConfigs(int configNo, std::vector<std::shared_ptr<PuzzleConfig>> &neighborConfigs)
+void DisassembleGraph::CalculateNeighborConfigs(int configID, std::vector<std::shared_ptr<PuzzleConfig>> &neighborConfigs)
 {
-    _GraphNodes[configNo]->CalculateNeighborConfigs(neighborConfigs);
+    _GraphNodes[configID]->CalculateNeighborConfigs(neighborConfigs);
+}
+
+int DisassembleGraph::GetPuzzleConfigNum() const
+{
+    return _GraphNodes.size();
+}
+
+void DisassembleGraph::Test_AddAllNeighborConfigs(int configID)
+{
+    std::vector<std::shared_ptr<PuzzleConfig>> neighborConfigs;
+    CalculateNeighborConfigs(configID, neighborConfigs);
+    for (auto neighbor : neighborConfigs)
+    {
+        _GraphNodes.push_back(neighbor);
+    }
+}
+
+void DisassembleGraph::BuildKernelDisassemblyGraph(int configID)
+{
+    if (_GraphNodes.empty())
+    {
+        LOG_ERROR("No puzzle cam be disassembled :( Please generate or import one.");
+        return;
+    }
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -17,41 +18,55 @@
 class PuzzleConfig
 {
 public:
-    void AddPuzzlePiece(std::shared_ptr<PuzzlePiece> puzzlePiece);
+    explicit PuzzleConfig(int depth);
+
+    // construct the config, these function should be called first before other operations
+    void AddPuzzlePiece(int pieceID, const PuzzlePieceInfo &puzzlePieceInfo);
+    void AddPuzzlePiece(int pieceID, std::shared_ptr<PuzzlePiece> puzzlePiece);
+    void AddPuzzlePiece(int pieceID, std::shared_ptr<PuzzlePiece> puzzlePiece, const PuzzlePieceState &state);
+
+    // --> ONLY used when enumerating neighbor configs, to keep materials unchanged
+    void SetPieceMaterial(int pieceID, const PuzzlePieceMaterial &material);
 
     // these functions are supposed to be called ONLY ONCE for one object
     void AssignPuzzlePieceMaterials();
     void BuildAccelStructures();
     void CalculateNeighborConfigs(std::vector<std::shared_ptr<PuzzleConfig>> &neighborConfigs);
 
+    // rendering
     void Render(Shader &shader, VertexBuffer &voxelModel);
+
+    // queries
+    int GetDepth() const;
+    std::array<int, 4> GetPuzzleSize() const; // MinX, MinZ, SizeX, SizeZ
 
 public:
     // helpers, don't use them directly unless for test
-    void _EnumerateSubassembly(int depth, std::set<int> &pieceNos, const std::function<void()> &callback);
-    bool _ValidateSubassembly(std::set<int> &pieceNos); // through DFS
+    void _EnumerateSubassembly(int depth, std::set<int> &pieceIDs, const std::function<void()> &callback);
+    bool _ValidateSubassembly(std::set<int> &pieceIDs); // through DFS
     void _BuildSubassemblyValidater();                  // through DSU
     void _CalculateBoundingBox();
     void _BuildAdjacencyGraph(std::vector<std::vector<int>> &occupiedMap);
     void _BuildOccupiedRLEMap(std::vector<std::vector<int>> &occupiedMap);
-    int _CalculateMaxMovableDistance(std::set<int> &pieceNos, int diretction);
+    int _CalculateMaxMovableDistance(std::set<int> &pieceIDs, int diretction);
 
 private:
-    std::vector<PuzzlePieceInfo> _Data;
+    std::unordered_map<int, PuzzlePieceInfo> _Data;
+    std::vector<int> _PieceIDs; // mainly used for enumerating subassemblies
+
+    // values for query
+    int _Depth = 0;
 
     // rendering: it's meaningless to generate something invisible!
-    std::vector<PuzzlePieceMaterial> _PuzzlePieceMaterials;
-    std::vector<int> _PuzzlePieceMaterialsMap;
-    std::vector<std::uint8_t> _PuzzlePieceInvisibility;
+    std::unordered_map<int, PuzzlePieceMaterial> _PuzzlePieceMaterialsMap;
 
     // accelration structures
     struct RLEInfo
     {
-        int _PieceNo;
+        int _PieceID;
         int _Length;
     };
-
-    std::vector<std::set<int>> _AdjacencyGraph;
+    std::unordered_map<int, std::set<int>> _AdjacencyGraph;
     std::vector<std::vector<RLEInfo>> _OccupiedRLEMapX;
     std::vector<std::vector<RLEInfo>> _OccupiedRLEMapZ;
     std::vector<std::vector<int>> _OccupiedRLEMapPreX;
@@ -60,6 +75,7 @@ private:
     int _MinX, _MaxX, _MinZ, _MaxZ;
     int _SizeX, _SizeZ;
 
+    // constants
     static int _NoPiece;
     static int _Inf;
 

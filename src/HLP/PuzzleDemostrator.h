@@ -10,10 +10,10 @@ public:
     void Init();
     void InitVoxelModel();
     void InitShaders();
-    void InitCamera();
 
     // executed per frame
     void Tick(float dt);
+    void CorrectCameraPos();
     void RenderPuzzle();
     void RenderMenu();
     void RenderMenu_FPSPanel();
@@ -31,7 +31,8 @@ private:
 
     // puzzle info
     bool _PuzzleImported = false;
-    int _CurrentConfigNo = 0;
+    int _CurrentConfigID = 0;
+    int _PrevConfigID = -1; // used to detect if the config changes (if so, then we need to correct the position of camera)
 
     // miscs
     float _DeltaTime;

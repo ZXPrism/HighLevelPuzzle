@@ -13,14 +13,17 @@ public:
     void Update(float dt);
 
     void SetCameraPos(const glm::vec3 &newPos);
+    void SetCameraPosX(float x);
 
     void LookAt(const glm::vec3 &center);
+    void LookAtX(float x);
 
 private:
     glm::mat4 _ViewMatrix = glm::mat4(1.0f);
     glm::mat4 _ProjMatrix = glm::mat4(1.0f);
 
     glm::vec3 _Pos = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 _Center = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 _Front = glm::vec3(0.0f, 0.0f, -1.0f);
     glm::vec3 _WorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
 

@@ -20,7 +20,13 @@ struct PuzzlePieceState
 
 struct PuzzlePieceInfo
 {
-    PuzzlePieceInfo(std::shared_ptr<PuzzlePiece> piece) : _Piece(piece)
+    PuzzlePieceInfo() = default;
+
+    explicit PuzzlePieceInfo(std::shared_ptr<PuzzlePiece> piece) : _Piece(piece)
+    {
+    }
+
+    PuzzlePieceInfo(std::shared_ptr<PuzzlePiece> piece, PuzzlePieceState state) : _Piece(piece), _State(state)
     {
     }
 
@@ -31,7 +37,7 @@ struct PuzzlePieceInfo
 struct PuzzlePieceMaterial
 {
     PuzzlePieceMaterial() = default;
-    PuzzlePieceMaterial(glm::vec3 &&color) noexcept : _Color(color)
+    explicit PuzzlePieceMaterial(glm::vec3 &&color) noexcept : _Color(color)
     {
     }
 

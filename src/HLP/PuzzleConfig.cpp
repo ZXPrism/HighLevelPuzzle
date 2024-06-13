@@ -15,9 +15,31 @@ int PuzzleConfig::_DxArray[4] = {0, 0, -1, 1};
 int PuzzleConfig::_DzArray[4] = {-1, 1, 0, 0};
 const char *PuzzleConfig::_DirArray[4] = {"BACK", "FORWARD", "LEFT", "RIGHT"};
 
-void PuzzleConfig::AddPuzzlePiece(std::shared_ptr<PuzzlePiece> puzzlePiece)
+PuzzleConfig::PuzzleConfig(int depth) : _Depth(depth)
 {
-    _Data.push_back(puzzlePiece);
+}
+
+int PuzzleConfig::GetDepth() const
+{
+    return _Depth;
+}
+
+void PuzzleConfig::AddPuzzlePiece(int pieceID, std::shared_ptr<PuzzlePiece> puzzlePiece)
+{
+    _Data[pieceID] = PuzzlePieceInfo(puzzlePiece);
+    _PieceIDs.push_back(pieceID);
+}
+
+void PuzzleConfig::AddPuzzlePiece(int pieceID, std::shared_ptr<PuzzlePiece> puzzlePiece, const PuzzlePieceState &state)
+{
+    _Data[pieceID] = PuzzlePieceInfo(puzzlePiece, state);
+    _PieceIDs.push_back(pieceID);
+}
+
+void PuzzleConfig::AddPuzzlePiece(int pieceID, const PuzzlePieceInfo &puzzlePieceInfo)
+{
+    _Data[pieceID] = puzzlePieceInfo;
+    _PieceIDs.push_back(pieceID);
 }
 
 void PuzzleConfig::Render(Shader &shader, VertexBuffer &voxelModel)
@@ -31,15 +53,15 @@ void PuzzleConfig::Render(Shader &shader, VertexBuffer &voxelModel)
         int z = 0;
         for (auto &run : _OccupiedRLEMapZ[x])
         {
-            int pieceNo = run._PieceNo, length = run._Length;
-            if (pieceNo != _NoPiece && !_PuzzlePieceInvisibility[pieceNo])
+            int pieceID = run._PieceID, length = run._Length;
+            if (pieceID != _NoPiece)
             {
                 for (int dz = 0; dz < length; dz++)
                 {
                     glm::mat4 model(1.0f);
                     pos = {x + _MinX, 0, z + dz + _MinZ}; // don't forget to map coordinates
                     shader.SetUniform("model", glm::translate(model, pos));
-                    shader.SetUniform("color", _PuzzlePieceMaterials[_PuzzlePieceMaterialsMap[pieceNo]]._Color);
+                    shader.SetUniform("color", _PuzzlePieceMaterialsMap[pieceID]._Color);
                     voxelModel.DrawTriangles(0, 36);
                 }
             }
@@ -49,11 +71,13 @@ void PuzzleConfig::Render(Shader &shader, VertexBuffer &voxelModel)
     }
 }
 
+void PuzzleConfig::SetPieceMaterial(int pieceID, const PuzzlePieceMaterial &material)
+{
+    _PuzzlePieceMaterialsMap[pieceID] = material;
+}
+
 void PuzzleConfig::AssignPuzzlePieceMaterials()
 {
-    _PuzzlePieceInvisibility.resize(_Data.size());
-    _PuzzlePieceMaterialsMap.resize(_Data.size());
-
     auto GenerateRandomColor = []() {
         static const std::vector<float> segments = {0, 0.4, 0.7, 1.0};
         static const std::vector<int> weight = {1, 5, 1};
@@ -68,45 +92,22 @@ void PuzzleConfig::AssignPuzzlePieceMaterials()
         return glm::vec3(res[0], res[1], res[2]);
     };
 
-    // 1. Generate material for piece #0
-    _PuzzlePieceMaterials.emplace_back(GenerateRandomColor());
+    // 2024-06-13 UPD:
+    // originally I assigned different materials(colors) to adjacent pieces
+    // but I found it useless now
+    // because if you move some pieces and some of them which are not adjacent before will be adjacent
+    // but you can't re-assign colors for them (or everything will be confusing)
+    // new strategy: every puzzle a piece has different color
 
-    // 2. Generate materials for the rest pieces
     int n = _Data.size();
-    for (int i = 1; i < n; i++)
+    for (int i = 0; i < n; i++)
     {
-        int colorIndex = 0;
-        bool flag = true;
-
-        do
-        {
-            flag = true;
-            for (auto adjacentPiece : _AdjacencyGraph[i])
-            {
-                if (colorIndex == _PuzzlePieceMaterialsMap[adjacentPiece])
-                {
-                    ++colorIndex;
-
-                    if (colorIndex == _PuzzlePieceMaterials.size())
-                    {
-                        _PuzzlePieceMaterials.emplace_back(GenerateRandomColor());
-                        break;
-                    }
-
-                    flag = false;
-                    break;
-                }
-            }
-        } while (!flag);
-
-        _PuzzlePieceMaterialsMap[i] = colorIndex;
+        _PuzzlePieceMaterialsMap[_PieceIDs[i]] = PuzzlePieceMaterial(GenerateRandomColor());
     }
 }
 
 void PuzzleConfig::_BuildAdjacencyGraph(std::vector<std::vector<int>> &occupiedMap)
 {
-    _AdjacencyGraph.resize(_Data.size());
-
     // initially all pieces' coordinates are in [0, sizeX) x [0, sizeZ)
     // mapped coordinates are in [sizeX, 2 * sizeX) x [sizeZ, 2 * sizeZ)
     // time complexity: O(4 * _PuzzleSizeX * _PuzzleSizeZ)
@@ -131,13 +132,13 @@ void PuzzleConfig::_BuildAdjacencyGraph(std::vector<std::vector<int>> &occupiedM
         }
     }
 
-    LOG_INFO("Adjacency graph building completed");
+    DLOG_INFO("Adjacency graph building completed");
     DEBUG_SCOPE({
         int n = _Data.size();
-        for (int i = 0; i < n; i++)
+        for (auto pieceID : pieceIDs)
         {
-            std::cout << i << " ->";
-            for (auto &adjacentPiece : _AdjacencyGraph[i])
+            std::cout << pieceID << " ->";
+            for (auto &adjacentPiece : _AdjacencyGraph[pieceID])
             {
                 std::cout << ' ' << adjacentPiece;
             }
@@ -152,13 +153,13 @@ void PuzzleConfig::CalculateNeighborConfigs(std::vector<std::shared_ptr<PuzzleCo
     _BuildSubassemblyValidater();
 
     // 1. enumerate subassemblies
-    std::set<int> subasmPieceNos;
-    _EnumerateSubassembly(0, subasmPieceNos, [&]() {
-        LOG_INFO("Found a valid subassembly!");
+    std::set<int> subasmPieceIDs;
+    _EnumerateSubassembly(0, subasmPieceIDs, [&]() {
+        DLOG_INFO("Found a valid subassembly!");
         DEBUG_SCOPE({
-            for (auto pieceNo : subasmPieceNos)
+            for (auto pieceID : subasmPieceIDs)
             {
-                std::cout << '<' << pieceNo << "> ";
+                std::cout << '<' << pieceID << "> ";
             }
             std::cout << std::endl;
         });
@@ -166,32 +167,67 @@ void PuzzleConfig::CalculateNeighborConfigs(std::vector<std::shared_ptr<PuzzleCo
         // 2. calculate the max movable distance in each direction
         for (int d = 0; d < 4; d++)
         {
-            int maxMovableSteps = _CalculateMaxMovableDistance(subasmPieceNos, d);
+            int maxMovableSteps = _CalculateMaxMovableDistance(subasmPieceIDs, d);
 
-            LOG_INFO("MaxMovableSteps in direction %s: %d", _DirArray[d], maxMovableSteps);
+            DLOG_INFO("MaxMovableSteps in direction %s: %d", _DirArray[d], maxMovableSteps);
 
-            // 3.
-            if (maxMovableSteps == _Inf) // remove the subassembly and label it as a target node
+            // 3.1 remove the subassembly and label it as a target node
+            if (maxMovableSteps == _Inf)
             {
-                ;
+                auto newConfig = neighborConfigs.emplace_back(std::make_shared<PuzzleConfig>(_Depth + 1));
+
+                int n = _Data.size();
+                for (int i = 0; i < n; i++)
+                {
+                    if (!subasmPieceIDs.contains(_PieceIDs[i]))
+                    {
+                        newConfig->AddPuzzlePiece(_PieceIDs[i], _Data[_PieceIDs[i]]);
+                        newConfig->SetPieceMaterial(_PieceIDs[i], _PuzzlePieceMaterialsMap[_PieceIDs[i]]);
+                    }
+                }
+
+                newConfig->BuildAccelStructures();
             }
-            else // for each unit distance, generate a neighborconfig
+            else // 3.2 for each unit distance, generate a neighborconfig
             {
                 for (int dist = 1; dist <= maxMovableSteps; dist++)
                 {
-                    ;
+                    auto newConfig = neighborConfigs.emplace_back(std::make_shared<PuzzleConfig>(_Depth + 1));
+
+                    int n = _Data.size();
+                    for (int i = 0; i < n; i++)
+                    {
+                        if (!subasmPieceIDs.contains(_PieceIDs[i]))
+                        {
+                            newConfig->AddPuzzlePiece(_PieceIDs[i], _Data[_PieceIDs[i]]);
+                        }
+                        else
+                        {
+                            auto state = _Data[_PieceIDs[i]]._State;
+                            state._OffsetX += _DxArray[d] * dist;
+                            state._OffsetZ += _DzArray[d] * dist;
+
+                            newConfig->AddPuzzlePiece(_PieceIDs[i], _Data[_PieceIDs[i]]._Piece, state);
+                        }
+
+                        newConfig->SetPieceMaterial(_PieceIDs[i], _PuzzlePieceMaterialsMap[_PieceIDs[i]]);
+                    }
+
+                    newConfig->BuildAccelStructures();
                 }
             }
         }
     });
+
+    LOG_INFO("Neighbor config calculation completed! Found %d neighbor(s).", neighborConfigs.size());
 }
 
-void PuzzleConfig::_EnumerateSubassembly(int depth, std::set<int> &pieceNos, const std::function<void()> &callback)
+void PuzzleConfig::_EnumerateSubassembly(int depth, std::set<int> &pieceIDs, const std::function<void()> &callback)
 {
     // Normally enumeration on sets have exponential time complexity
     // But through correct pruning we will never reach that upper limit! (i hope so)
 
-    if (pieceNos.size() <= (_Data.size() + 1) / 2 && depth != 0)
+    if (pieceIDs.size() <= (_Data.size() + 1) / 2 && depth != 0)
     {
         callback();
     }
@@ -203,26 +239,26 @@ void PuzzleConfig::_EnumerateSubassembly(int depth, std::set<int> &pieceNos, con
 
     for (int i = depth; i < _Data.size(); i++)
     {
-        bool connected = (_SubasmValidator.Find(i) == _SubasmValidator.Find(std::max(0, depth - 1)));
+        bool connected = (depth == 0) ? true : (_SubasmValidator.Find(_PieceIDs[i]) == _SubasmValidator.Find(_PieceIDs[depth - 1]));
         if (connected) // make sure the newly visited piece is "connected" to previous pieces
         {
-            pieceNos.insert(i);
-            _EnumerateSubassembly(i + 1, pieceNos, callback);
-            pieceNos.erase(i);
+            pieceIDs.insert(_PieceIDs[i]);
+            _EnumerateSubassembly(i + 1, pieceIDs, callback);
+            pieceIDs.erase(_PieceIDs[i]);
         }
     }
 }
 
-bool PuzzleConfig::_ValidateSubassembly(std::set<int> &pieceNos)
+bool PuzzleConfig::_ValidateSubassembly(std::set<int> &pieceIDs)
 {
     // ! deprecated !
     // since I found a better approach: use Disjoint Set Union
 
     // do a DFS from the first element on the _AdjacencyGraph
     // check if every element can be visited
-    // time complexity: O(pieceNos.size())
+    // time complexity: O(pieceIDs.size())
 
-    if (pieceNos.empty())
+    if (pieceIDs.empty())
     {
         return false;
     }
@@ -236,8 +272,8 @@ bool PuzzleConfig::_ValidateSubassembly(std::set<int> &pieceNos)
     // when you try to use stack / queue to realize DFS / BFS
     // FIRST consider their recursive form!
 
-    visStack.push(*pieceNos.begin());
-    vis[*pieceNos.begin()] = 1;
+    visStack.push(*pieceIDs.begin());
+    vis[*pieceIDs.begin()] = 1;
 
     while (!visStack.empty())
     {
@@ -248,7 +284,7 @@ bool PuzzleConfig::_ValidateSubassembly(std::set<int> &pieceNos)
 
         for (auto adjacentPiece : _AdjacencyGraph[topPiece])
         {
-            if (pieceNos.contains(adjacentPiece) && !vis[adjacentPiece])
+            if (pieceIDs.contains(adjacentPiece) && !vis[adjacentPiece])
             {
                 vis[adjacentPiece] = 1;
                 visStack.push(adjacentPiece);
@@ -256,27 +292,27 @@ bool PuzzleConfig::_ValidateSubassembly(std::set<int> &pieceNos)
         }
     }
 
-    return visCount == pieceNos.size();
+    return visCount == pieceIDs.size();
 }
 
 void PuzzleConfig::_BuildSubassemblyValidater()
 {
     int n = _Data.size();
 
-    _SubasmValidator.Init(n);
+    _SubasmValidator.Init(_PieceIDs.back() + 1); // TODO: can you optimize it? some space is wasted!
 
     for (int i = 0; i < n; i++)
     {
-        for (auto &adjacentPiece : _AdjacencyGraph[i])
+        for (auto &adjacentPiece : _AdjacencyGraph[_PieceIDs[i]])
         {
-            _SubasmValidator.Unite(i, adjacentPiece);
+            _SubasmValidator.Unite(_PieceIDs[i], adjacentPiece);
         }
     }
 }
 
-int PuzzleConfig::_CalculateMaxMovableDistance(std::set<int> &pieceNos, int direction)
+int PuzzleConfig::_CalculateMaxMovableDistance(std::set<int> &pieceIDs, int direction)
 {
-    // stuck at here for a couple of hours
+    // stuck at here for two days
     // I am too dumb to figure this out..but eventually did it!
     // KEY idea: a subassembly can be removed *if and only if* no other pieces block its way in the moving direction!
 
@@ -291,9 +327,9 @@ int PuzzleConfig::_CalculateMaxMovableDistance(std::set<int> &pieceNos, int dire
     bool removable = true;
 
     // we can check the max movable distance of each voxel in the subassembly
-    for (auto pieceNo : pieceNos)
+    for (auto pieceID : pieceIDs)
     {
-        auto &[piece, state] = _Data[pieceNo];
+        auto &[piece, state] = _Data[pieceID];
         for (auto &voxel : piece->_Voxels)
         {
             int x = voxel._X + state._OffsetX - _MinX;
@@ -307,9 +343,9 @@ int PuzzleConfig::_CalculateMaxMovableDistance(std::set<int> &pieceNos, int dire
 
                 while (offset >= 0 && offset < RLEMapXSize_Z)
                 {
-                    int pieceNoCheck = _OccupiedRLEMapX[z][offset]._PieceNo;
+                    int pieceIDCheck = _OccupiedRLEMapX[z][offset]._PieceID;
 
-                    if (pieceNoCheck != _NoPiece && !pieceNos.contains(pieceNoCheck))
+                    if (pieceIDCheck != _NoPiece && !pieceIDs.contains(pieceIDCheck))
                     {
                         int blockCoord =
                             _OccupiedRLEMapPreX[z][offset + 1] -
@@ -334,9 +370,9 @@ int PuzzleConfig::_CalculateMaxMovableDistance(std::set<int> &pieceNos, int dire
 
                 while (offset >= 0 && offset < RLEMapZSize_X)
                 {
-                    int pieceNoCheck = _OccupiedRLEMapZ[x][offset]._PieceNo;
+                    int pieceIDCheck = _OccupiedRLEMapZ[x][offset]._PieceID;
 
-                    if (pieceNoCheck != _NoPiece && !pieceNos.contains(pieceNoCheck))
+                    if (pieceIDCheck != _NoPiece && !pieceIDs.contains(pieceIDCheck))
                     {
                         int blockCoord = _OccupiedRLEMapPreZ[x][offset + 1] - _OccupiedRLEMapZ[x][offset]._Length;
                         if (dz < 0)
@@ -364,8 +400,9 @@ void PuzzleConfig::_CalculateBoundingBox()
     _MaxX = -_Inf;
     _MaxZ = -_Inf;
 
-    for (auto &[piece, state] : _Data)
+    for (auto &[pieceID, info] : _Data)
     {
+        auto &[piece, state] = info;
         for (auto &voxel : piece->_Voxels)
         {
             int x = voxel._X + state._OffsetX;
@@ -408,16 +445,16 @@ void PuzzleConfig::_BuildOccupiedRLEMap(std::vector<std::vector<int>> &occupiedM
             _OccupiedRLEMapPreX[z][i + 1] = _OccupiedRLEMapPreX[z][i] + _OccupiedRLEMapX[z][i]._Length;
         }
 
-        LOG_INFO("Constructed _OccupiedRLEMapX[%d]:", z);
+        DLOG_INFO("Constructed _OccupiedRLEMapX[%d]:", z);
         DEBUG_SCOPE({
             for (auto &run : _OccupiedRLEMapX[z])
             {
-                std::cout << std::format("<{}, {}> ", run._PieceNo, run._Length);
+                std::cout << std::format("<{}, {}> ", run._PieceID, run._Length);
             }
             std::cout << std::endl;
         });
 
-        LOG_INFO("Constructed _OccupiedRLEMapPreX[%d]:", z);
+        DLOG_INFO("Constructed _OccupiedRLEMapPreX[%d]:", z);
         DEBUG_SCOPE({
             for (auto &val : _OccupiedRLEMapPreX[z])
             {
@@ -445,23 +482,23 @@ void PuzzleConfig::_BuildOccupiedRLEMap(std::vector<std::vector<int>> &occupiedM
         // process the last segment
         _OccupiedRLEMapZ[x].push_back({occupiedMap[x][prev], _SizeZ - prev});
 
-        int n = _OccupiedRLEMapZ[x].size(), run = 0;
+        int n = _OccupiedRLEMapZ[x].size();
         _OccupiedRLEMapPreZ[x].resize(n + 1);
         for (int i = 0; i < n; i++)
         {
             _OccupiedRLEMapPreZ[x][i + 1] = _OccupiedRLEMapPreZ[x][i] + _OccupiedRLEMapZ[x][i]._Length;
         }
 
-        LOG_INFO("Constructed _OccupiedRLEMapZ[%d]:", x);
+        DLOG_INFO("Constructed _OccupiedRLEMapZ[%d]:", x);
         DEBUG_SCOPE({
             for (auto &run : _OccupiedRLEMapZ[x])
             {
-                std::cout << std::format("<{}, {}> ", run._PieceNo, run._Length);
+                std::cout << std::format("<{}, {}> ", run._PieceID, run._Length);
             }
             std::cout << std::endl;
         });
 
-        LOG_INFO("Constructed _OccupiedRLEMapPreZ[%d]:", x);
+        DLOG_INFO("Constructed _OccupiedRLEMapPreZ[%d]:", x);
         DEBUG_SCOPE({
             for (auto &val : _OccupiedRLEMapPreZ[x])
             {
@@ -478,15 +515,15 @@ void PuzzleConfig::BuildAccelStructures()
 
     std::vector<std::vector<int>> occupiedMap(_SizeX, std::vector<int>(_SizeZ, _NoPiece));
     int n = _Data.size();
-    for (int i = 0; i < n; i++)
+    for (auto &[pieceID, info] : _Data)
     {
-        auto &[piece, state] = _Data[i];
+        auto &[piece, state] = info;
         for (auto &voxel : piece->_Voxels)
         {
             // coordinates need to be mapped!
             int x = voxel._X + state._OffsetX - _MinX;
             int z = voxel._Z + state._OffsetZ - _MinZ;
-            occupiedMap[x][z] = i;
+            occupiedMap[x][z] = pieceID;
         }
     }
 
@@ -497,7 +534,11 @@ void PuzzleConfig::BuildAccelStructures()
     _BuildOccupiedRLEMap(occupiedMap);
 
     // adjacency graph is used to facilitate:
-    // 1. material assignment
-    // 2. subassembly enumeration
+    // 1. subassembly enumeration
     _BuildAdjacencyGraph(occupiedMap);
+}
+
+std::array<int, 4> PuzzleConfig::GetPuzzleSize() const // MinX, MinZ, SizeX, Size
+{
+    return {_MinX, _MinZ, _SizeX, _SizeZ};
 }

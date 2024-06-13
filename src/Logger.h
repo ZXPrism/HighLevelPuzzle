@@ -34,3 +34,13 @@ extern Logger gLogger;
 #define LOG_WARNING(...)
 #define LOG_ERROR(...)
 #endif
+
+#ifdef DETAILED_DEBUG_INFO
+#define DLOG_INFO(...) gLogger.Log(LogLevel::INFO, __FUNCTION__, __VA_ARGS__)
+#define DLOG_WARNING(...) gLogger.Log(LogLevel::WARNING, __FUNCTION__, __VA_ARGS__)
+#define DLOG_ERROR(...) gLogger.Log(LogLevel::ERROR, __FUNCTION__, __VA_ARGS__)
+#else
+#define DLOG_INFO(...)
+#define DLOG_WARNING(...)
+#define DLOG_ERROR(...)
+#endif

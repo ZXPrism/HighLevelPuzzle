@@ -13,17 +13,18 @@
 
 void PuzzleDemonstrator::Init()
 {
-    InitCamera();
     InitVoxelModel();
     InitShaders();
 
     gTimer.DispatchTask(1.0f, [&]() { DetectPuzzleFiles(); });
 }
 
-void PuzzleDemonstrator::InitCamera()
+void PuzzleDemonstrator::CorrectCameraPos()
 {
-    _Camera.SetCameraPos({3.0f, 10.0f, 0.1f});
-    _Camera.LookAt({3.0f, 0.0f, 0.0f});
+    auto &config = _DasmGraph.GetPuzzleConfig(_CurrentConfigID);
+    auto [minX, minZ, sizeX, sizeZ] = config.GetPuzzleSize();
+    _Camera.SetCameraPos({minX + sizeX / 2.0, 10.0f, minZ + sizeZ / 2.0 + 0.01f});
+    _Camera.LookAt({minX + sizeX / 2.0, 0.0f, minZ + sizeZ / 2.0});
 }
 
 void PuzzleDemonstrator::InitVoxelModel()
@@ -68,13 +69,19 @@ void PuzzleDemonstrator::Tick(float dt)
 
     _BasicShader.Activate();
     _BasicShader.SetUniform("view", _Camera.GetViewMatrix());
+
+    if (_PuzzleImported && _PrevConfigID != _CurrentConfigID)
+    {
+        _PrevConfigID = _CurrentConfigID;
+        CorrectCameraPos();
+    }
 }
 
 void PuzzleDemonstrator::RenderPuzzle()
 {
     if (_PuzzleImported)
     {
-        _DasmGraph.RenderConfig(_CurrentConfigNo, _BasicShader, _VoxelModel);
+        _DasmGraph.RenderConfig(_CurrentConfigID, _BasicShader, _VoxelModel);
     }
 }
 
@@ -133,10 +140,11 @@ void PuzzleDemonstrator::RenderMenu_DasmPlanner()
     if (ImGui::Button("IMPORT") && !_PuzzleFiles.empty())
     {
         std::string puzzleFilePath = (fs::path(cPuzzleFileFolder) / _PuzzleFiles[selected]).string();
-        if (_DasmGraph.ImportPuzzle(puzzleFilePath)) // if import success
+        if (_DasmGraph.ImportPuzzle(puzzleFilePath)) // in case the import fails
         {
             _PuzzleImported = true;
-            _CurrentConfigNo = 0;
+            _CurrentConfigID = 0;
+            _PrevConfigID = -1;
         }
     }
     ImGui::SameLine();
@@ -147,17 +155,22 @@ void PuzzleDemonstrator::RenderMenu_DasmPlanner()
         std::string currentPuzzlePath = _PuzzleFiles[selected];
         currentPuzzlePath = currentPuzzlePath.substr(0, currentPuzzlePath.find('.')); // strip the extension
         ImGui::Text("Current Puzzle: <%s>", currentPuzzlePath.c_str());
-        ImGui::Text("Current Config: #%d", _CurrentConfigNo);
-        if (ImGui::Button("Show Neighbor Configs"))
+        ImGui::Text("Current Config: #%d", _CurrentConfigID);
+
+        // if (ImGui::Button("Show Neighbor Configs"))
+        // {
+        //     _DasmGraph.Test_AddAllNeighborConfigs(_CurrentConfigID);
+        // }
+
+        // int configNum = _DasmGraph.GetPuzzleConfigNum();
+        // if (ImGui::Button("Next Config"))
+        // {
+        //     _CurrentConfigID = (_CurrentConfigID + 1) % configNum;
+        // }
+
+        if (ImGui::Button("Build Kernel Disassembly Graph"))
         {
-            auto &rootConfig = _DasmGraph.GetPuzzleConfig(0);
-            std::vector<std::shared_ptr<PuzzleConfig>> neighborConfigs;
-            rootConfig.CalculateNeighborConfigs(neighborConfigs);
-            // std::set<int> x = {0};
-            // for (int i = 0; i < 4; i++)
-            // {
-            //     LOG_INFO("(direction: %d) ==> %d", i, rootConfig._CalculateMaxMovableDistance(x, i));
-            // }
+            _DasmGraph.BuildKernelDisassemblyGraph();
         }
     }
 }

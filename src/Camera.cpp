@@ -41,8 +41,13 @@ Camera::Camera()
         ypos = yPos;
     });
 #endif
-    gApp.RegisterOnWindowSizeFunc(
-        [&](int width, int height) { _ProjMatrix = glm::perspective(_Fov, 1.0f * width / height, 0.1f, 100.0f); });
+    gApp.RegisterOnWindowSizeFunc([&](int width, int height) {
+        if (!width || !height)
+        {
+            return;
+        }
+        _ProjMatrix = glm::perspective(_Fov, 1.0f * width / height, 0.1f, 100.0f);
+    });
 
     _ProjMatrix = glm::perspective(_Fov, 1.0f * cWindowWidth / cWindowHeight, 0.1f, 100.0f);
 }
@@ -64,6 +69,7 @@ void Camera::SetCameraPos(const glm::vec3 &newPos)
 
 void Camera::LookAt(const glm::vec3 &center)
 {
+    _Center = center;
     _Front = glm::normalize(center - _Pos);
 }
 
@@ -88,4 +94,15 @@ void Camera::Update(float dt)
         _Pos -= glm::normalize(glm::cross(right, _Front)) * speed;
 
     _ViewMatrix = glm::lookAt(_Pos, _Pos + _Front, _WorldUp);
+}
+
+void Camera::SetCameraPosX(float x)
+{
+    _Pos.x = x;
+}
+
+void Camera::LookAtX(float x)
+{
+    _Center.x = x;
+    _Front = glm::normalize(_Center - _Pos);
 }
