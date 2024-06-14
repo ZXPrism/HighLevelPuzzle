@@ -1,6 +1,5 @@
 #include "PuzzleConfig.h"
 
-#include <format>
 #include <stack>
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -15,13 +14,18 @@ int PuzzleConfig::_DxArray[4] = {0, 0, -1, 1};
 int PuzzleConfig::_DzArray[4] = {-1, 1, 0, 0};
 const char *PuzzleConfig::_DirArray[4] = {"BACK", "FORWARD", "LEFT", "RIGHT"};
 
-PuzzleConfig::PuzzleConfig(int depth) : _Depth(depth)
+PuzzleConfig::PuzzleConfig(int depth, int originalPieceNum) : _Depth(depth), _OriginalPieceNum(originalPieceNum)
 {
 }
 
 int PuzzleConfig::GetDepth() const
 {
     return _Depth;
+}
+
+bool PuzzleConfig::IsFullConfig() const
+{
+    return _PieceIDs.size() == _OriginalPieceNum;
 }
 
 void PuzzleConfig::AddPuzzlePiece(int pieceID, std::shared_ptr<PuzzlePiece> puzzlePiece)
@@ -126,6 +130,7 @@ void PuzzleConfig::_BuildAdjacencyGraph(std::vector<std::vector<int>> &occupiedM
                         occupiedMap[nx][nz] != occupiedMap[x][z])
                     {
                         _AdjacencyGraph[occupiedMap[x][z]].insert(occupiedMap[nx][nz]);
+                        _AdjacencyGraph[occupiedMap[nx][nz]].insert(occupiedMap[x][z]);
                     }
                 }
             }
@@ -174,7 +179,7 @@ void PuzzleConfig::CalculateNeighborConfigs(std::vector<std::shared_ptr<PuzzleCo
             // 3.1 remove the subassembly and label it as a target node
             if (maxMovableSteps == _Inf)
             {
-                auto newConfig = neighborConfigs.emplace_back(std::make_shared<PuzzleConfig>(_Depth + 1));
+                auto newConfig = neighborConfigs.emplace_back(std::make_shared<PuzzleConfig>(_Depth + 1, _OriginalPieceNum));
 
                 int n = _Data.size();
                 for (int i = 0; i < n; i++)
@@ -187,12 +192,14 @@ void PuzzleConfig::CalculateNeighborConfigs(std::vector<std::shared_ptr<PuzzleCo
                 }
 
                 newConfig->BuildAccelStructures();
+
+                return; // if a piece can be removed, we don't care how it's removed
             }
             else // 3.2 for each unit distance, generate a neighborconfig
             {
                 for (int dist = 1; dist <= maxMovableSteps; dist++)
                 {
-                    auto newConfig = neighborConfigs.emplace_back(std::make_shared<PuzzleConfig>(_Depth + 1));
+                    auto newConfig = neighborConfigs.emplace_back(std::make_shared<PuzzleConfig>(_Depth + 1, _OriginalPieceNum));
 
                     int n = _Data.size();
                     for (int i = 0; i < n; i++)
@@ -239,7 +246,8 @@ void PuzzleConfig::_EnumerateSubassembly(int depth, std::set<int> &pieceIDs, con
 
     for (int i = depth; i < _Data.size(); i++)
     {
-        bool connected = (depth == 0) ? true : (_SubasmValidator.Find(_PieceIDs[i]) == _SubasmValidator.Find(_PieceIDs[depth - 1]));
+        bool connected =
+            (pieceIDs.size() == 0) ? true : (_SubasmValidator.Find(_PieceIDs[i]) == _SubasmValidator.Find(_PieceIDs[depth - 1]));
         if (connected) // make sure the newly visited piece is "connected" to previous pieces
         {
             pieceIDs.insert(_PieceIDs[i]);
@@ -299,11 +307,11 @@ void PuzzleConfig::_BuildSubassemblyValidater()
 {
     int n = _Data.size();
 
-    _SubasmValidator.Init(_PieceIDs.back() + 1); // TODO: can you optimize it? some space is wasted!
+    _SubasmValidator.Init(_PieceIDs.back() + 1); // TODO: optimize it! some space is wasted!
 
     for (int i = 0; i < n; i++)
     {
-        for (auto &adjacentPiece : _AdjacencyGraph[_PieceIDs[i]])
+        for (auto adjacentPiece : _AdjacencyGraph[_PieceIDs[i]])
         {
             _SubasmValidator.Unite(_PieceIDs[i], adjacentPiece);
         }
@@ -514,7 +522,6 @@ void PuzzleConfig::BuildAccelStructures()
     _CalculateBoundingBox();
 
     std::vector<std::vector<int>> occupiedMap(_SizeX, std::vector<int>(_SizeZ, _NoPiece));
-    int n = _Data.size();
     for (auto &[pieceID, info] : _Data)
     {
         auto &[piece, state] = info;
@@ -542,3 +549,33 @@ std::array<int, 4> PuzzleConfig::GetPuzzleSize() const // MinX, MinZ, SizeX, Siz
 {
     return {_MinX, _MinZ, _SizeX, _SizeZ};
 }
+
+bool PuzzleConfig::IsEqualTo(const PuzzleConfig &rhs)
+{
+    if (_Data.size() != rhs._Data.size() || _SizeX != rhs._SizeX || _SizeZ != rhs._SizeZ)
+    {
+        return false;
+    }
+
+    for (auto &[pieceID, pieceInfo] : _Data)
+    {
+        auto iter = rhs._Data.find(pieceID);
+        if (iter == _Data.end())
+        {
+            return false;
+        }
+        else
+        {
+            int relX = pieceInfo._State._OffsetX - _MinX, relZ = pieceInfo._State._OffsetZ - _MinZ;
+            int rhsRelX = iter->second._State._OffsetX - rhs._MinX, rhsRelZ = iter->second._State._OffsetZ - rhs._MinZ;
+            if (relX != rhsRelX || relZ != rhsRelZ)
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+// generate if remove then else!!!!

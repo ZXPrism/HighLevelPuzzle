@@ -1,10 +1,10 @@
 #pragma once
 
 #include <array>
-#include <cstdint>
 #include <functional>
 #include <memory>
 #include <set>
+#include <unordered_set>
 #include <vector>
 
 #include "Shader.h"
@@ -18,7 +18,7 @@
 class PuzzleConfig
 {
 public:
-    explicit PuzzleConfig(int depth);
+    explicit PuzzleConfig(int depth, int originalPieceNum);
 
     // construct the config, these function should be called first before other operations
     void AddPuzzlePiece(int pieceID, const PuzzlePieceInfo &puzzlePieceInfo);
@@ -38,7 +38,9 @@ public:
 
     // queries
     int GetDepth() const;
+    bool IsFullConfig() const;
     std::array<int, 4> GetPuzzleSize() const; // MinX, MinZ, SizeX, SizeZ
+    bool IsEqualTo(const PuzzleConfig &rhs);
 
 public:
     // helpers, don't use them directly unless for test
@@ -56,6 +58,7 @@ private:
 
     // values for query
     int _Depth = 0;
+    int _OriginalPieceNum = 0;
 
     // rendering: it's meaningless to generate something invisible!
     std::unordered_map<int, PuzzlePieceMaterial> _PuzzlePieceMaterialsMap;
@@ -66,7 +69,7 @@ private:
         int _PieceID;
         int _Length;
     };
-    std::unordered_map<int, std::set<int>> _AdjacencyGraph;
+    std::unordered_map<int, std::unordered_set<int>> _AdjacencyGraph;
     std::vector<std::vector<RLEInfo>> _OccupiedRLEMapX;
     std::vector<std::vector<RLEInfo>> _OccupiedRLEMapZ;
     std::vector<std::vector<int>> _OccupiedRLEMapPreX;

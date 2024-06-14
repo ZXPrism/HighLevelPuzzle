@@ -23,7 +23,7 @@ void PuzzleDemonstrator::CorrectCameraPos()
 {
     auto &config = _DasmGraph.GetPuzzleConfig(_CurrentConfigID);
     auto [minX, minZ, sizeX, sizeZ] = config.GetPuzzleSize();
-    _Camera.SetCameraPos({minX + sizeX / 2.0, 10.0f, minZ + sizeZ / 2.0 + 0.01f});
+    _Camera.SetCameraPos({minX + sizeX / 2.0, 15.0f, minZ + sizeZ / 2.0 + 0.01f});
     _Camera.LookAt({minX + sizeX / 2.0, 0.0f, minZ + sizeZ / 2.0});
 }
 
@@ -87,16 +87,22 @@ void PuzzleDemonstrator::RenderPuzzle()
 
 void PuzzleDemonstrator::RenderMenu()
 {
+#ifdef MY_DEBUG
     ui::internal::ShowDemoWindow();
+#endif
 
-    ui::StandardWindow("Menu", [&]() {
-        ImGui::SeparatorText("MISCS");
+    ui::StandardWindow("HLP Demo Menu", [&]() {
         RenderMenu_FPSPanel();
 
-        ImGui::SeparatorText("DISASSEMBLY PLANNER");
-        RenderMenu_DasmPlanner();
+        if (ImGui::CollapsingHeader("DISASSEMBLY PLANNER"))
+        {
+            RenderMenu_DasmPlanner();
+        }
 
-        ImGui::SeparatorText("PUZZLE GENERATOR");
+        if (ImGui::CollapsingHeader("PUZZLE GENERATOR"))
+        {
+            ;
+        }
 
         ImGui::End();
     });
@@ -154,23 +160,53 @@ void PuzzleDemonstrator::RenderMenu_DasmPlanner()
     {
         std::string currentPuzzlePath = _PuzzleFiles[selected];
         currentPuzzlePath = currentPuzzlePath.substr(0, currentPuzzlePath.find('.')); // strip the extension
-        ImGui::Text("Current Puzzle: <%s>", currentPuzzlePath.c_str());
-        ImGui::Text("Current Config: #%d", _CurrentConfigID);
+        ImGui::Text("Loaded Puzzle: <%s>", currentPuzzlePath.c_str());
 
-        // if (ImGui::Button("Show Neighbor Configs"))
-        // {
-        //     _DasmGraph.Test_AddAllNeighborConfigs(_CurrentConfigID);
-        // }
+        auto &currentConfig = _DasmGraph.GetPuzzleConfig(_CurrentConfigID);
+        auto configSize = currentConfig.GetPuzzleSize();
+        auto depth = currentConfig.GetDepth();
 
-        // int configNum = _DasmGraph.GetPuzzleConfigNum();
-        // if (ImGui::Button("Next Config"))
-        // {
-        //     _CurrentConfigID = (_CurrentConfigID + 1) % configNum;
-        // }
-
-        if (ImGui::Button("Build Kernel Disassembly Graph"))
+        ImGui::SeparatorText("Current Config Info");
         {
-            _DasmGraph.BuildKernelDisassemblyGraph();
+            ImGui::Text("ID: #%d", _CurrentConfigID);
+            ImGui::Text("MinX = %d, MinZ = %d, SizeX = %d, SizeZ = %d", configSize[0], configSize[1], configSize[2], configSize[3]);
+            ImGui::Text("Depth: %d", depth);
+
+            bool isFullConfig = currentConfig.IsFullConfig();
+            ImGui::Checkbox("Full Config", &isFullConfig);
+
+            // test: check if two config is equal
+            static int equalityCheckIDs[2] = {0, 0};
+            bool equalityCheckRes =
+                (_DasmGraph.GetPuzzleConfig(equalityCheckIDs[0]).IsEqualTo(_DasmGraph.GetPuzzleConfig(equalityCheckIDs[1])));
+            ImGui::Checkbox("Check Equality", &equalityCheckRes);
+            ImGui::SameLine();
+            ImGui::InputInt2("", equalityCheckIDs);
+
+            int configNum = _DasmGraph.GetPuzzleConfigNum();
+            if (ImGui::Button("Prev Config"))
+            {
+                _CurrentConfigID = (_CurrentConfigID - 1 + configNum) % configNum;
+            }
+            ImGui::SameLine();
+
+            if (ImGui::Button("Next Config"))
+            {
+                _CurrentConfigID = (_CurrentConfigID + 1) % configNum;
+            }
+        }
+
+        ImGui::SeparatorText("Disassemble Puzzle");
+        {
+            if (ImGui::Button("Disassemble [Kernel]"))
+            {
+                _DasmGraph.BuildKernelDisassemblyGraph();
+            }
+
+            if (ImGui::Button("Disassemble [Complete]"))
+            {
+                ;
+            }
         }
     }
 }

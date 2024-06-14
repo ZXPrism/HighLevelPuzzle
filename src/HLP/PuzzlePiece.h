@@ -14,6 +14,11 @@ struct PuzzlePiece
 
 struct PuzzlePieceState
 {
+    bool operator==(const PuzzlePieceState &rhs)
+    {
+        return _OffsetX == rhs._OffsetX && _OffsetZ == rhs._OffsetZ;
+    }
+
     int _OffsetX = 0;
     int _OffsetZ = 0;
 };

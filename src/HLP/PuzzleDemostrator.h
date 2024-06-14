@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Camera.h"
-#include "DisassembleGraph.h"
+#include "DisassemblyGraph.h"
 
 class PuzzleDemonstrator
 {
@@ -24,7 +24,7 @@ public:
 
 private:
     // disassemble planner
-    DisassembleGraph _DasmGraph;
+    DisassemblyGraph _DasmGraph;
 
     // puzzle designer
     ;

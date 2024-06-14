@@ -25,12 +25,12 @@ namespace ui {
             colors[ImGuiCol_TabActive] = {0.5f, 0.5f, 0.5f, 1.0f};
             colors[ImGuiCol_TabHovered] = {0.3f, 0.3f, 0.3f, 1.0f};
 
-            colors[ImGuiCol_Header] = {0.3f, 0.3f, 0.3f, 1.0f};
-            colors[ImGuiCol_HeaderHovered] = {0.5f, 0.5f, 0.5f, 1.0f};
+            colors[ImGuiCol_Header] = {0.5f, 0.5f, 0.5f, 1.0f};
+            colors[ImGuiCol_HeaderHovered] = {0.7f, 0.7f, 0.7f, 1.0f};
 
             colors[ImGuiCol_FrameBg] = {0.3f, 0.3f, 0.3f, 1.0f};
 
-            colors[ImGuiCol_Button] = {0.6f, 0.6f, 0.6f, 1.0f};
+            colors[ImGuiCol_Button] = {0.5f, 0.5f, 0.8f, 1.0f};
 
             style.WindowPadding = {8, 10};
             style.FramePadding = {8, 8};
