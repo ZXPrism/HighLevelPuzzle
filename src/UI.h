@@ -24,7 +24,6 @@ namespace ui {
     void Shutdown();
 
     // widgets
-    void FileBrowser(const std::string &title, bool *pOpen, std::string &selectedPath, bool &fileSelected);
     void StandardWindow(const std::string &title, const std::function<void()> &callback);
     void Combo(int &selected, std::vector<std::string> &items, const std::string &preview);
 

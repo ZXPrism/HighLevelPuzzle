@@ -4,10 +4,8 @@
 - NOT finished yet!
 
 ## TODO
-- 06-07 ~ 06-11
   - [X] Basic Architecture (rendering, puzzle representation, etc.)
 
-- 06-12 Wed
   - [X] _MaxMovableDistance & optimizations
   - [X] calculate neighbor configs
   - [X] rename all `pieceNo` to `pieceID`
@@ -15,20 +13,14 @@
   - [X] add a variable to label the "depth" of configurations
   - [X] display all neighbor configs
 
-- 06-13 Thu
   - [X] fix the bug of inconsistent piece colors between configs (do not re-assign colors!)
   - [X] fix the bug of potential acesss violation for configs that some pieces have already been removed (since I assume the vector indices are the ID of puzzle piece, if a puzzle piece is removed, problems will occur)
   - [X] adjust the camera position so that it always focuses on the center of the puzzle whatever the config is
 
-- 06-14 Fri
   - [X] the criteria of determining two configs are the same should be carefully devised (absolute or relative?)
   - [X] compute the kernel disassembly graph and level of difficulty
 
-- 06-15 Sat
   - [X] display the kernel disassembly graph
   - [X] compute the complete disassembly graph, display it
 
-...
-
-- 07?
   - [ ] puzzle generation

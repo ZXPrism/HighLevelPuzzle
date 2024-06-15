@@ -99,7 +99,7 @@ void PuzzleDemonstrator::RenderMenu()
             RenderMenu_DasmPlanner();
         }
 
-        if (ImGui::CollapsingHeader("PUZZLE GENERATOR"))
+        if (ImGui::CollapsingHeader("PUZZLE GENERATOR (WIP)"))
         {
             ;
         }
