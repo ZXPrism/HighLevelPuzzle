@@ -65,6 +65,7 @@ const glm::mat4 &Camera::GetProjectionMatrix() const
 void Camera::SetCameraPos(const glm::vec3 &newPos)
 {
     _Pos = newPos;
+    _Front = glm::normalize(_Center - _Pos);
 }
 
 void Camera::LookAt(const glm::vec3 &center)
@@ -105,4 +106,9 @@ void Camera::LookAtX(float x)
 {
     _Center.x = x;
     _Front = glm::normalize(_Center - _Pos);
+}
+
+glm::vec3 Camera::GetCameraPos() const
+{
+    return _Pos;
 }

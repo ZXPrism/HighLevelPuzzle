@@ -23,9 +23,9 @@ int PuzzleConfig::GetDepth() const
     return _Depth;
 }
 
-bool PuzzleConfig::IsFullConfig() const
+bool PuzzleConfig::IsFullConfig(int delta) const
 {
-    return _PieceIDs.size() == _OriginalPieceNum;
+    return _PieceIDs.size() + delta == _OriginalPieceNum;
 }
 
 void PuzzleConfig::AddPuzzlePiece(int pieceID, std::shared_ptr<PuzzlePiece> puzzlePiece)
@@ -578,4 +578,12 @@ bool PuzzleConfig::IsEqualTo(const PuzzleConfig &rhs)
     return true;
 }
 
-// generate if remove then else!!!!
+int PuzzleConfig::GetPuzzlePieceNum() const
+{
+    return _PieceIDs.size();
+}
+
+int PuzzleConfig::GetRemovedPieceNum() const
+{
+    return _OriginalPieceNum - _PieceIDs.size();
+}

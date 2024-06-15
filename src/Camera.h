@@ -12,6 +12,8 @@ public:
 
     void Update(float dt);
 
+    glm::vec3 GetCameraPos() const;
+
     void SetCameraPos(const glm::vec3 &newPos);
     void SetCameraPosX(float x);
 

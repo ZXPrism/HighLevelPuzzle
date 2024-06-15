@@ -1,6 +1,7 @@
 # HighLevelPuzzle
 - A simpilified implementation of SIGGRAPH 2022 paper "Computational Design of High-level Interlocking Puzzles"
 - Course Project of ZJU "Advances in Computer Graphics" of 2023-2024 spring & summer semester
+- NOT finished yet!
 
 ## TODO
 - 06-07 ~ 06-11
@@ -24,6 +25,10 @@
   - [X] compute the kernel disassembly graph and level of difficulty
 
 - 06-15 Sat
-  - [ ] display the kernel disassembly graph
-  - [ ] compute the complete disassembly graph, display it
-  - [ ] puzzle design?
+  - [X] display the kernel disassembly graph
+  - [X] compute the complete disassembly graph, display it
+
+...
+
+- 07?
+  - [ ] puzzle generation

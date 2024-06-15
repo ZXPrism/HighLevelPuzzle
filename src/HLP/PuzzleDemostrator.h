@@ -31,6 +31,7 @@ private:
 
     // puzzle info
     bool _PuzzleImported = false;
+    int _CurrentPlanOffset = 0;
     int _CurrentConfigID = 0;
     int _PrevConfigID = -1; // used to detect if the config changes (if so, then we need to correct the position of camera)
 

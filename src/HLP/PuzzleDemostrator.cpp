@@ -16,7 +16,7 @@ void PuzzleDemonstrator::Init()
     InitVoxelModel();
     InitShaders();
 
-    gTimer.DispatchTask(1.0f, [&]() { DetectPuzzleFiles(); });
+    gTimer.DispatchLoopTask(1.0f, [&]() { DetectPuzzleFiles(); });
 }
 
 void PuzzleDemonstrator::CorrectCameraPos()
@@ -150,6 +150,7 @@ void PuzzleDemonstrator::RenderMenu_DasmPlanner()
         {
             _PuzzleImported = true;
             _CurrentConfigID = 0;
+            _CurrentPlanOffset = 0;
             _PrevConfigID = -1;
         }
     }
@@ -198,14 +199,36 @@ void PuzzleDemonstrator::RenderMenu_DasmPlanner()
 
         ImGui::SeparatorText("Disassemble Puzzle");
         {
-            if (ImGui::Button("Disassemble [Kernel]"))
+            if (!_DasmGraph.IsDisasmGraphBuilt())
             {
-                _DasmGraph.BuildKernelDisassemblyGraph();
+                if (ImGui::Button("Disassemble [Kernel]"))
+                {
+                    _DasmGraph.BuildKernelDisassemblyGraph();
+                }
+
+                if (ImGui::Button("Disassemble [Complete]"))
+                {
+                    _DasmGraph.BuildCompleteDisassemblyGraph();
+                }
             }
 
-            if (ImGui::Button("Disassemble [Complete]"))
+            if (_DasmGraph.IsDisasmGraphBuilt())
             {
-                ;
+                int disasmPlanSize = _DasmGraph.GetDisasmPlanSize();
+                if (ImGui::Button("Prev Disasm Config"))
+                {
+                    _CurrentPlanOffset = (_CurrentPlanOffset - 1 + disasmPlanSize) % disasmPlanSize;
+                    _CurrentConfigID = _DasmGraph.GetDisasmPlanConfigID(_CurrentPlanOffset);
+                }
+                ImGui::SameLine();
+
+                if (ImGui::Button("Next Disasm Config"))
+                {
+                    _CurrentPlanOffset = (_CurrentPlanOffset + 1) % disasmPlanSize;
+                    _CurrentConfigID = _DasmGraph.GetDisasmPlanConfigID(_CurrentPlanOffset);
+                }
+
+                ImGui::Text("Difficulty: %d", _DasmGraph.GetPuzzleDifficulty());
             }
         }
     }

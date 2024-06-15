@@ -38,8 +38,10 @@ public:
 
     // queries
     int GetDepth() const;
-    bool IsFullConfig() const;
+    bool IsFullConfig(int delta = 0) const;
     std::array<int, 4> GetPuzzleSize() const; // MinX, MinZ, SizeX, SizeZ
+    int GetPuzzlePieceNum() const;
+    int GetRemovedPieceNum() const;
     bool IsEqualTo(const PuzzleConfig &rhs);
 
 public:
