@@ -116,6 +116,7 @@ void DisassemblyGraph::BuildKernelDisassemblyGraph(int configID, int relativeDep
     }
 
     int currentMinTargetNodeDepth = 0x3f3f3f3f;
+    _TargetNodeIDs.clear();
 
     std::unordered_map<int, bool> visit;
     std::queue<int> queue;
@@ -134,6 +135,7 @@ void DisassemblyGraph::BuildKernelDisassemblyGraph(int configID, int relativeDep
 
         auto &frontConfig = _GraphNodes[frontConfigID];
         int currentDepth = frontConfig->GetDepth();
+
         if (!frontConfig->IsFullConfig(fullConfigDelta))
         {
             currentMinTargetNodeDepth = std::min(currentMinTargetNodeDepth, currentDepth);
