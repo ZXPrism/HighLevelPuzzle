@@ -1,7 +1,7 @@
 set_project("HighLevelPuzzle")
 
 add_rules("mode.debug", "mode.release")
-add_requires("glfw", "stb", "glm", "glad")
+add_requires("glfw", "glm", "glad")
 add_requires("imgui", {configs = { glfw = true, opengl3 = true }})
 
 if is_mode("debug") then
@@ -16,9 +16,7 @@ target("HLP-Demo")
 
     add_files("src/**.cpp")
     add_includedirs("src")
-    add_packages("glfw", "stb", "glm", "imgui", "glad")
-    
-    add_options("detailed-debug-info")
+    add_packages("glfw", "glm", "imgui", "glad")
 
     after_build(function (target)
         os.cp(target:targetfile(), "bin/")

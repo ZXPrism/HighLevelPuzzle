@@ -21,7 +21,7 @@ void Application::Init()
     glfwWindowHint(GLFW_SAMPLES, 4);
     _pWindow = glfwCreateWindow(cWindowWidth, cWindowHeight, cpWindowTitle, nullptr, nullptr);
     glfwMakeContextCurrent(_pWindow);
-    glfwSwapInterval(1);
+    // glfwSwapInterval(1);
 
     auto vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
     glfwSetWindowPos(_pWindow, (vidmode->width - cWindowWidth) / 2, (vidmode->height - cWindowHeight) / 2);
@@ -139,7 +139,6 @@ void Application::OnMouseButton(int button, int action, int mods)
 {
     for (auto &fn : _OnMouseButtonVec)
         fn(button, action, mods);
-    ;
 }
 
 void Application::OnScroll(double xOffset, double yOffset)
