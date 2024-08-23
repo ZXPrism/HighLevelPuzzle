@@ -27,3 +27,10 @@
   - [X] compute the complete disassembly graph, display it
 
   - [ ] puzzle generation
+
+
+## Example
+![sample1](sample1.png)
+![sample2](sample2.png)
+
+(You can see, it's much farther away from what the original paper intends to show us..)
